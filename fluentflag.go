@@ -1,4 +1,9 @@
-package flagbuilder
+// fluentflag.go
+// Copyright (c) 2025 mattmc3
+// SPDX-License-Identifier: MIT
+// Project home: https://github.com/mattmc3/fluentflag
+
+package fluentflag
 
 import (
 	"errors"
