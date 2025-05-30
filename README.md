@@ -4,7 +4,7 @@
 
 **fluentflag** provides a fluent, type-safe API for defining and registering command-line flags in Go. It wraps the standard library's `flag` package, making it easier to declare flags, set defaults, add short aliases, and handle slices - all with a clean, chainable syntax.
 
-> **Requires Go 1.18+**
+**NOTE:** _Requires Go 1.18+_
 
 ---
 
