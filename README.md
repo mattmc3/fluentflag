@@ -6,8 +6,6 @@
 
 **NOTE:** _Requires Go 1.18+_
 
----
-
 ## Why
 
 Go's standard library `flag` package is simple and reliable, but it lacks some features:
@@ -18,8 +16,6 @@ Go's standard library `flag` package is simple and reliable, but it lacks some f
 
 Many third-party argument parsers exist, but most are large and complex. **fluentflag** provides a few awesome enhancements to make `flag` more usable - support for short aliases, slice support for accumulating values, a better usage printer, and generics - in a single, lightweight file you can simply drop into your project or use as a module.
 
----
-
 ## Features
 
 -   Type-safe flag registration (bool, string, int, int64, float64, uint, uint64)
@@ -28,15 +24,11 @@ Many third-party argument parsers exist, but most are large and complex. **fluen
 -   Slice flag support (accumulate multiple values)
 -   Works seamlessly with the Go standard library's `flag` package
 
----
-
 ## Install
 
 ```sh
 go get github.com/mattmc3/fluentflag
 ```
-
----
 
 ## Example
 
@@ -96,8 +88,6 @@ func main() {
 }
 ```
 
----
-
 ## Example CLI Usage
 
 ```sh
@@ -119,8 +109,6 @@ argparser --exclusive=1 --exclusive=2 --exclusive=3
 # Mix short and long flags
 argparser -n bar -X 10 --ignore-unknown --exclusive=7 --exclusive=8
 ```
-
----
 
 ## API
 
