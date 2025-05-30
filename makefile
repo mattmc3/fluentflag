@@ -22,7 +22,7 @@ build: ## Build the project
 
 test: ## Run tests
 	@echo "Running tests..."
-	$(GO) test -v ./... | ./bin/colorize
+	$(GO) test -v ./... | ./tools/colorize
 
 clean: ## Clean build artifacts
 	@echo "Cleaning..."
