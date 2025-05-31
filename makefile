@@ -3,7 +3,7 @@
 GO=go
 GOFLAGS=-trimpath
 PUBLISH_DIR=publish
-PACKAGE=github.com/mattmc3/fluentgo
+PACKAGE=github.com/mattmc3/fluentflag
 MAIN_PACKAGE=$(PACKAGE)
 BIN_NAME=foogo
 
