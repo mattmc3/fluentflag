@@ -53,36 +53,37 @@ type MyOpts struct {
 
 func main() {
     opts := MyOpts{}
-    fluentflag.NewFlagBuilder[string]("name", "Command name for error messages").
+    builder := fluentflag.NewFlagBuilder()
+    builder.StringFlag("name", "Command name for error messages").
         Alias('n').
         Default("foo").
         Build(&opts.Name)
-    fluentflag.NewFlagBuilder[bool]("help", "Show this help message").
+    builder.BoolFlag("help", "Show this help message").
         Alias('h').
         Build(&opts.Help)
-    fluentflag.NewFlagBuilder[int]("min-args", "Minimum number of non-option arguments").
+    builder.IntFlag("min-args", "Minimum number of non-option arguments").
         Alias('N').
         Default(-1).
         Build(&opts.MinArgs)
-    fluentflag.NewFlagBuilder[int]("max-args", "Maximum number of non-option arguments").
+    builder.IntFlag("max-args", "Maximum number of non-option arguments").
         Alias('X').
         Default(-1).
         Build(&opts.MaxArgs)
-    fluentflag.NewFlagBuilder[bool]("ignore-unknown", "Ignore unknown options").
+    builder.BoolFlag("ignore-unknown", "Ignore unknown options").
         Alias('i').
         Build(&opts.IgnoreUnknown)
-    fluentflag.NewFlagBuilder[bool]("stop-nonopt", "Stop scanning at first non-option").
+    builder.BoolFlag("stop-nonopt", "Stop scanning at first non-option").
         Alias('s').
         Build(&opts.StopNonOpt)
-    fluentflag.NewFlagBuilder[bool]("version", "Print version number").
+    builder.BoolFlag("version", "Print version number").
         Alias('v').
         Build(&opts.Version)
-    opts.Exclusive = fluentflag.NewFlagBuilder[int]("exclusive", "Comma-separated mutually exclusive options").
+    opts.Exclusive = builder.IntFlag("exclusive", "Comma-separated mutually exclusive options").
         Alias('x').
         BuildSlice()
 
     // Parse flags as usual
-    fluentflag.Parse()
+    flag.Parse()
 
     fmt.Printf("%+v\n", opts)
 }
@@ -112,8 +113,14 @@ argparser -n bar -X 10 --ignore-unknown --exclusive=7 --exclusive=8
 
 ## API
 
--   `NewFlagBuilder[T](name, usage string) *FlagBuilder[T]`
-    Create a new flag builder for type `T`.
+-   `NewFlagBuilder() *FlagBuilder`
+    Create a new flag builder.
+-   `StringFlag(name, usage string) *FluentFlag[string]`
+    Create a new string flag.
+-   `BoolFlag(name, usage string) *FluentFlag[bool]`
+    Create a new boolean flag.
+-   `IntFlag(name, usage string) *FluentFlag[int]`
+    Create a new integer flag.
 -   `.Alias(rune)`
     Set a short flag alias (e.g. `-n` for `--name`).
 -   `.Default(value T)`
@@ -124,5 +131,3 @@ argparser -n bar -X 10 --ignore-unknown --exclusive=7 --exclusive=8
     Register the flag and return a pointer to the storage variable.
 -   `.BuildSlice() *[]T`
     Register a flag that accumulates values into a slice.
--   `fluentflag.Parse()`
-    Parse the flags (just like `flag.Parse()`).

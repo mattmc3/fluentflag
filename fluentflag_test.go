@@ -30,33 +30,58 @@ func TestNewFlagBuilder_BasicFields(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			resetFlags()
-			b := NewFlagBuilder[string](tt.name, tt.usage)
-			if b.name != tt.name {
-				t.Errorf("expected name %q, got %q", tt.name, b.name)
+			b := NewFlagBuilder()
+			var f any
+			switch tt.name {
+			case "testbool":
+				f = b.BoolFlag(tt.name, tt.usage)
+			case "teststr":
+				f = b.StringFlag(tt.name, tt.usage)
+			case "testint":
+				f = b.IntFlag(tt.name, tt.usage)
+			case "testint64":
+				f = b.Int64Flag(tt.name, tt.usage)
+			case "testfloat64":
+				f = b.Float64Flag(tt.name, tt.usage)
+			case "testuint":
+				f = b.UintFlag(tt.name, tt.usage)
+			case "testuint64":
+				f = b.Uint64Flag(tt.name, tt.usage)
 			}
-			if b.usage != tt.usage {
-				t.Errorf("expected usage %q, got %q", tt.usage, b.usage)
+			ff := f.(interface {
+				GetName() string
+				GetUsage() string
+			})
+			if ff.GetName() != tt.name {
+				t.Errorf("expected name %q, got %q", tt.name, ff.GetName())
+			}
+			if ff.GetUsage() != tt.usage {
+				t.Errorf("expected usage %q, got %q", tt.usage, ff.GetUsage())
 			}
 		})
 	}
 }
 
+func (f *FluentFlag[T]) GetName() string  { return f.name }
+func (f *FluentFlag[T]) GetUsage() string { return f.usage }
+
 func TestFlagBuilder_FluentAPI(t *testing.T) {
 	resetFlags()
-	b := NewFlagBuilder[int]("num", "number flag").Alias('n').Default(42)
-	if b.alias != 'n' {
-		t.Errorf("expected alias 'n', got %v", b.alias)
+	b := NewFlagBuilder()
+	f := b.IntFlag("num", "number flag").Alias('n').Default(42)
+	if f.alias != 'n' {
+		t.Errorf("expected alias 'n', got %v", f.alias)
 	}
-	if b.defaultVal != 42 {
-		t.Errorf("expected default 42, got %v", b.defaultVal)
+	if f.defaultVal != 42 {
+		t.Errorf("expected default 42, got %v", f.defaultVal)
 	}
 }
 
 func TestFlagBuilder_Build_Bool(t *testing.T) {
 	resetFlags()
 	var val bool
-	b := NewFlagBuilder[bool]("flag", "bool flag").Default(true)
-	b.Build(&val)
+	b := NewFlagBuilder()
+	b.BoolFlag("flag", "bool flag").Default(true).Build(&val)
 	args := []string{"--flag=false"}
 	flag.CommandLine.Parse(args)
 	if val != false {
@@ -67,8 +92,8 @@ func TestFlagBuilder_Build_Bool(t *testing.T) {
 func TestFlagBuilder_Build_Int(t *testing.T) {
 	resetFlags()
 	var val int
-	b := NewFlagBuilder[int]("num", "int flag").Default(5)
-	b.Build(&val)
+	b := NewFlagBuilder()
+	b.IntFlag("num", "int flag").Default(5).Build(&val)
 	args := []string{"--num=99"}
 	flag.CommandLine.Parse(args)
 	if val != 99 {
@@ -79,8 +104,8 @@ func TestFlagBuilder_Build_Int(t *testing.T) {
 func TestFlagBuilder_Build_String_WithAlias(t *testing.T) {
 	resetFlags()
 	var val string
-	b := NewFlagBuilder[string]("word", "string flag").Alias('w').Default("foo")
-	b.Build(&val)
+	b := NewFlagBuilder()
+	b.StringFlag("word", "string flag").Alias('w').Default("foo").Build(&val)
 	args := []string{"-w", "bar"}
 	flag.CommandLine.Parse(args)
 	if val != "bar" {
@@ -90,8 +115,8 @@ func TestFlagBuilder_Build_String_WithAlias(t *testing.T) {
 
 func TestFlagBuilder_BuildVar(t *testing.T) {
 	resetFlags()
-	b := NewFlagBuilder[int64]("big", "big int").Default(123)
-	ptr := b.BuildVar()
+	b := NewFlagBuilder()
+	ptr := b.Int64Flag("big", "big int").Default(123).BuildVar()
 	args := []string{"--big=456"}
 	flag.CommandLine.Parse(args)
 	if *ptr != 456 {
@@ -101,8 +126,8 @@ func TestFlagBuilder_BuildVar(t *testing.T) {
 
 func TestFlagBuilder_BuildSlice_String(t *testing.T) {
 	resetFlags()
-	b := NewFlagBuilder[string]("item", "item flag")
-	slice := b.BuildSlice()
+	b := NewFlagBuilder()
+	slice := b.StringFlag("item", "item flag").BuildSlice()
 	args := []string{"--item=foo", "--item=bar", "--item=baz"}
 	flag.CommandLine.Parse(args)
 	want := []string{"foo", "bar", "baz"}
@@ -113,8 +138,8 @@ func TestFlagBuilder_BuildSlice_String(t *testing.T) {
 
 func TestFlagBuilder_BuildSlice_Int_WithAlias(t *testing.T) {
 	resetFlags()
-	b := NewFlagBuilder[int]("num", "number").Alias('n')
-	slice := b.BuildSlice()
+	b := NewFlagBuilder()
+	slice := b.IntFlag("num", "number").Alias('n').BuildSlice()
 	args := []string{"-n", "1", "-n", "2", "--num=3"}
 	flag.CommandLine.Parse(args)
 	want := []int{1, 2, 3}
@@ -142,14 +167,14 @@ func TestParse_InvalidValue(t *testing.T) {
 // 		}
 // 	}()
 // 	type mytype struct{}
-// 	_ = NewFlagBuilder[mytype]("bad", "bad type")
+// 	_ = NewFlagBuilder[mytype]().NewFlag("bad", "bad type")
 // }
 
 func TestFlagBuilder_Build_DefaultValue(t *testing.T) {
 	resetFlags()
 	var val uint
-	b := NewFlagBuilder[uint]("count", "count flag").Default(7)
-	b.Build(&val)
+	b := NewFlagBuilder()
+	b.UintFlag("count", "count flag").Default(7).Build(&val)
 	flag.CommandLine.Parse([]string{})
 	if val != 7 {
 		t.Errorf("expected default 7, got %v", val)
@@ -158,8 +183,8 @@ func TestFlagBuilder_Build_DefaultValue(t *testing.T) {
 
 func TestFlagBuilder_BuildSlice_DefaultEmpty(t *testing.T) {
 	resetFlags()
-	b := NewFlagBuilder[float64]("flt", "float flag")
-	slice := b.BuildSlice()
+	b := NewFlagBuilder()
+	slice := b.Float64Flag("flt", "float flag").BuildSlice()
 	flag.CommandLine.Parse([]string{})
 	if len(*slice) != 0 {
 		t.Errorf("expected empty slice, got %v", *slice)
@@ -169,8 +194,8 @@ func TestFlagBuilder_BuildSlice_DefaultEmpty(t *testing.T) {
 func TestFlagBuilder_Build_Uint64(t *testing.T) {
 	resetFlags()
 	var val uint64
-	b := NewFlagBuilder[uint64]("big", "big flag").Default(12345)
-	b.Build(&val)
+	b := NewFlagBuilder()
+	b.Uint64Flag("big", "big flag").Default(12345).Build(&val)
 	args := []string{"--big=67890"}
 	flag.CommandLine.Parse(args)
 	if val != 67890 {
@@ -180,8 +205,8 @@ func TestFlagBuilder_Build_Uint64(t *testing.T) {
 
 func TestFlagBuilder_UsageString(t *testing.T) {
 	resetFlags()
-	b := NewFlagBuilder[string]("foo", "foo usage")
-	b.BuildVar()
+	b := NewFlagBuilder()
+	b.StringFlag("foo", "foo usage").BuildVar()
 	fs := flag.CommandLine
 	usage := ""
 	fs.VisitAll(func(f *flag.Flag) {
@@ -197,7 +222,8 @@ func TestFlagBuilder_UsageString(t *testing.T) {
 func ExampleFlagBuilder() {
 	resetFlags()
 	var verbose bool
-	NewFlagBuilder[bool]("verbose", "enable verbose mode").Alias('v').Default(false).Build(&verbose)
+	NewFlagBuilder()
+	NewFlagBuilder().BoolFlag("verbose", "enable verbose mode").Alias('v').Default(false).Build(&verbose)
 	os.Args = []string{"cmd", "-v"}
 	flag.CommandLine.Parse(os.Args[1:])
 	fmt.Println(verbose)
@@ -284,11 +310,12 @@ func TestFlagBuilder_TableDrivenCombos(t *testing.T) {
 				strSlice *[]string
 				intSlice *[]int
 			)
-			NewFlagBuilder[string]("string", "string flag").Alias('s').Default("default").Build(&strVal)
-			NewFlagBuilder[bool]("bool", "bool flag").Alias('b').Default(false).Build(&boolVal)
-			NewFlagBuilder[int]("int", "int flag").Alias('i').Build(&intVal)
-			strSlice = NewFlagBuilder[string]("strslice", "string slice flag").Alias('S').BuildSlice()
-			intSlice = NewFlagBuilder[int]("intslice", "int slice flag").Alias('I').BuildSlice()
+			b := NewFlagBuilder()
+			b.StringFlag("string", "string flag").Alias('s').Default("default").Build(&strVal)
+			b.BoolFlag("bool", "bool flag").Alias('b').Default(false).Build(&boolVal)
+			b.IntFlag("int", "int flag").Alias('i').Build(&intVal)
+			strSlice = b.StringFlag("strslice", "string slice flag").Alias('S').BuildSlice()
+			intSlice = b.IntFlag("intslice", "int slice flag").Alias('I').BuildSlice()
 
 			err := flag.CommandLine.Parse(tt.args)
 			if err != nil {
@@ -312,4 +339,16 @@ func TestFlagBuilder_TableDrivenCombos(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestFlagBuilder_PartiallyBuiltPanic(t *testing.T) {
+	resetFlags()
+	b := NewFlagBuilder()
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic for partially built flag, but did not panic")
+		}
+	}()
+	b.BoolFlag("flag1", "usage1")
+	b.IntFlag("flag2", "usage2") // should panic here
 }
