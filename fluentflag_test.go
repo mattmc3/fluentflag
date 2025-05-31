@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -159,16 +160,88 @@ func TestParse_InvalidValue(t *testing.T) {
 	}
 }
 
-// This test won't even compile, but we leave it here just for reference
-// func TestParse_UnsupportedType(t *testing.T) {
-// 	defer func() {
-// 		if r := recover(); r == nil {
-// 			t.Error("expected panic for unsupported type")
-// 		}
-// 	}()
-// 	type mytype struct{}
-// 	_ = NewFlagBuilder[mytype]().NewFlag("bad", "bad type")
-// }
+func TestNewFlagBuilderWithSet(t *testing.T) {
+	resetFlags()
+	customSet := flag.NewFlagSet("custom", flag.ContinueOnError)
+	b := NewFlagBuilderWithSet(customSet)
+	var val int
+	b.IntFlag("num", "number").Default(1).Build(&val)
+	customSet.Parse([]string{"--num=5"})
+	if val != 5 {
+		t.Errorf("expected 5, got %v", val)
+	}
+}
+
+func TestBuildSlice_LongAndShortFlags(t *testing.T) {
+	resetFlags()
+	b := NewFlagBuilder()
+	slice := b.StringFlag("item", "item flag").Alias('i').BuildSlice()
+	args := []string{"--item=foo", "-i", "bar"}
+	flag.CommandLine.Parse(args)
+	want := []string{"foo", "bar"}
+	if !reflect.DeepEqual(*slice, want) {
+		t.Errorf("expected %v, got %v", want, *slice)
+	}
+}
+
+func TestAccumValuesString(t *testing.T) {
+	var s []int
+	acc := &accumValues[int]{target: &s}
+	acc.Set("1")
+	acc.Set("2")
+	str := acc.String()
+	if str != "[1 2]" {
+		t.Errorf("expected '[1 2]', got %q", str)
+	}
+}
+
+func TestBuildSliceDefaultAlwaysEmpty(t *testing.T) {
+	resetFlags()
+	b := NewFlagBuilder()
+	slice := b.StringFlag("s", "slice").Default("ignored").BuildSlice()
+	flag.CommandLine.Parse([]string{})
+	if len(*slice) != 0 {
+		t.Errorf("expected empty slice, got %v", *slice)
+	}
+}
+
+func TestAccumValuesSetErrorPropagation(t *testing.T) {
+	var s []int
+	acc := &accumValues[int]{target: &s}
+	err := acc.Set("notanint")
+	if err == nil {
+		t.Error("expected error for invalid int")
+	}
+}
+
+func TestAliasZeroNoShortFlag(t *testing.T) {
+	resetFlags()
+	b := NewFlagBuilder()
+	var val int
+	b.IntFlag("num", "number").Alias(0).Default(1).Build(&val)
+	args := []string{"-0", "2"}
+	err := flag.CommandLine.Parse(args)
+	if err == nil {
+		t.Error("expected error for unknown shorthand")
+	}
+}
+
+func TestFlagBuilder_InternalFields(t *testing.T) {
+	resetFlags()
+	b := NewFlagBuilder()
+	f := b.IntFlag("num", "number")
+	if b.building != f {
+		t.Error("expected building to be set to current flag")
+	}
+	var v int
+	f.Build(&v)
+	if b.building != nil {
+		t.Error("expected building to be nil after Build")
+	}
+	if len(b.flagsBuilt) == 0 {
+		t.Error("expected flagsBuilt to have at least one entry")
+	}
+}
 
 func TestFlagBuilder_Build_DefaultValue(t *testing.T) {
 	resetFlags()
@@ -351,4 +424,58 @@ func TestFlagBuilder_PartiallyBuiltPanic(t *testing.T) {
 	}()
 	b.BoolFlag("flag1", "usage1")
 	b.IntFlag("flag2", "usage2") // should panic here
+}
+
+func TestMultipleBuildCalls(t *testing.T) {
+	resetFlags()
+	b := NewFlagBuilder()
+	f := b.IntFlag("num", "number")
+	var v1, v2 int
+	f.Build(&v1)
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic for flag redefinition, but did not panic")
+		} else if msg, ok := r.(error); ok && msg.Error() != "flag redefined: num" && !contains(msg.Error(), "flag redefined") {
+			t.Errorf("unexpected panic: %v", r)
+		}
+	}()
+	f.Build(&v2) // should panic
+}
+
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || (len(s) > len(substr) && (contains(s[1:], substr) || contains(s[:len(s)-1], substr))))
+}
+
+func TestFlagBuilder_UsageFormatting(t *testing.T) {
+	resetFlags()
+	builder := NewFlagBuilder()
+	builder.StringFlag("name", "Command name for error messages").Alias('n').Default("foo").BuildVar()
+	builder.BoolFlag("help", "Show this help message").Alias('h').BuildVar()
+	builder.IntFlag("min-args", "Minimum number of non-option arguments").Alias('N').Default(-1).BuildVar()
+	builder.IntFlag("max-args", "Maximum number of non-option arguments").Alias('X').Default(-1).BuildVar()
+	builder.BoolFlag("ignore-unknown", "Ignore unknown options").Alias('i').BuildVar()
+	builder.BoolFlag("stop-nonopt", "Stop scanning at first non-option").Alias('s').BuildVar()
+	builder.BoolFlag("version", "Print version number").Alias('v').BuildVar()
+	builder.IntFlag("exclusive", "Comma-separated mutually exclusive options").Alias('x').BuildVar()
+	builder.StringFlag("this-is-a-very-long-flag-name-for-testing", "A very long flag name to test wrapping").Alias('L').Default("long").BuildVar()
+
+	var buf strings.Builder
+	builder.SetOutput(&buf)
+	builder.PrintUsage()
+	actual := strings.TrimRight(buf.String(), "\n")
+
+	expected := `  -n, --name string        Command name for error messages (default "foo")
+  -h, --help               Show this help message
+  -N, --min-args int       Minimum number of non-option arguments (default -1)
+  -X, --max-args int       Maximum number of non-option arguments (default -1)
+  -i, --ignore-unknown     Ignore unknown options
+  -s, --stop-nonopt        Stop scanning at first non-option
+  -v, --version            Print version number
+  -x, --exclusive int      Comma-separated mutually exclusive options
+  -L, --this-is-a-very-long-flag-name-for-testing string
+                           A very long flag name to test wrapping (default "long")`
+
+	if actual != expected {
+		t.Errorf("Usage output mismatch.\nGot:\n%s\nWant:\n%s", actual, expected)
+	}
 }
